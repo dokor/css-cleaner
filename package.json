@@ -35,6 +35,9 @@
   },
   "dependencies": {
     "picomatch": "4.0.7",
+    "postcss": "8.5.31",
+    "postcss-selector-parser": "7.1.7",
+    "sass-parser": "0.5.3",
     "typescript": "5.9.3"
   }
 }
