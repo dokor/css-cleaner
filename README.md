@@ -4,9 +4,10 @@ CSS Cleaner est un projet de CLI qui aide à nettoyer progressivement les styles
 
 **État du projet** — Le socle, la découverte, les analyseurs CSS/Sass et JSX, le rapprochement et les rapports sont fusionnés. La commande d’audit reste à assembler dans [l’issue #7](https://github.com/dokor/css-cleaner/issues/7), avant la validation sur Next.js et Vite dans [l’issue #8](https://github.com/dokor/css-cleaner/issues/8). [Suivre l’avancement sur GitHub](https://github.com/dokor/css-cleaner/issues/9).
 
-Deux faux positifs de confiance élevée sur les CSS Modules utilisés via une variable
-intermédiaire ou via `composes` sont suivis dans [l’issue #17](https://github.com/dokor/css-cleaner/issues/17).
-Leur correction fait partie des prérequis de sortie du MVP.
+Les lectures de CSS Modules via une variable intermédiaire sont conservées.
+Les déclarations `composes` produisent un avertissement qui réduit la confiance
+des classes dans les portées concernées. Une origine indéterminée, comme un chemin
+interpolé, rend l’analyse incertaine à l’échelle du projet.
 
 ## Ce que l’outil analysera
 

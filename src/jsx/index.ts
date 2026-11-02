@@ -285,6 +285,14 @@ export const analyzeJsx: AnalyzeJsx = async ({ sources, resolveStyleImport }) =>
         else if (ts.isJsxExpression(node.initializer) && node.initializer.expression) emitExpression(node.initializer.expression);
       } else if (ts.isCallExpression(node) && isHelper(node)) {
         emitExpression(node);
+      } else if (ts.isVariableDeclaration(node) && node.initializer) {
+        // A module object can escape through an alias or destructuring binding.
+        const initializer = unwrap(node.initializer);
+        if (!visited.has(initializer) && emitModule(initializer)) visited.add(initializer);
+      } else if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+        // Reads such as `const name = styles.title` retain their module identity
+        // even when the eventual className value cannot be traced statically.
+        if (!visited.has(node) && emitModule(node)) visited.add(node);
       }
       ts.forEachChild(node, visit);
     }

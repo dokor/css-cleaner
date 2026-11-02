@@ -37,6 +37,7 @@ couverture locale et globale. Un fichier vide a aussi une couverture explicite.
 | `dynamic-style-selector` | Une interpolation de sélecteur rend la règle et ses descendants incertains ; ils ne produisent aucune définition certaine. |
 | `unsupported-style-selector` | Un sélecteur invalide, un parent non résolu ou une expansion excessive est écarté avec une couverture `partial`. |
 | `unsupported-sass-construction` | Les mixins, appels, fonctions, conditions, boucles, imports Sass, extensions, placeholders, `@at-root`, `@content` et interpolations d’at-rules ne sont pas évalués. Les sous-arbres concernés sont écartés. |
+| `unresolved-css-composition` | Une déclaration `composes` rend incertain l’usage des classes dans les portées concernées ; les définitions restent visibles. |
 
 Les règles statiques indépendantes restent exploitables. `affectedScopes`
 conserve l’incertitude du fichier, des parents et des descendants écartés ;
@@ -44,6 +45,16 @@ les constructions Sass pouvant générer des portées inconnues affectent les
 portées globale et locale du fichier. Une erreur de parsing d’un module affecte
 les deux portées, puisqu’une éventuelle échappée globale n’est plus vérifiable.
 Les modules distincts entièrement analysés restent complets.
+
+Pour `composes`, la portée propriétaire est affectée. Un chemin relatif explicite
+vers un fichier CSS, SCSS ou Sass ajoute la portée du fichier cible ; `from global`
+ajoute la portée globale. Un fichier global peut aussi contenir des classes
+`:local`, donc ses deux portées sont prises en compte. Les modules indépendants
+gardent leur confiance habituelle lorsque la cible est identifiable.
+Les alias, chemins interpolés ou échappés et autres origines indéterminées
+produisent une incertitude de portée projet. Les noms composés et leur graphe
+transitif ne sont pas résolus. Le rapport reste partiel et les classes concernées
+peuvent figurer parmi les inutilisées avec une confiance faible.
 
 L’expansion est plafonnée à 256 alternatives par règle. L’analyse n’évalue
 aucune expression Sass et ne cherche pas les définitions importées ou générées.
