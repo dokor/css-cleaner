@@ -1,0 +1,36 @@
+{
+  "name": "css-cleaner",
+  "version": "0.1.0",
+  "description": "CLI locale d’audit des classes CSS pour React",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "bin": {
+    "css-cleaner": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm run build && tsc --project tsconfig.test.json && node --test .test-dist/tests/*.test.js",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "typescript": "5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dokor/css-cleaner.git"
+  }
+}
