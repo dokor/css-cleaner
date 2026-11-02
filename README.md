@@ -83,3 +83,5 @@ deux classes `button` dans des modules SCSS et Sass et couvre les imports
 inconnus, les usages dynamiques et les candidats de diagnostic.
 [`tests/contracts.test.ts`](tests/contracts.test.ts) vérifie ces identités et
 l’utilisation indépendante des interfaces, sans simuler un véritable analyseur.
+
+Créé par Antoine LE LOUËT ([https://antoine.lelouet.fr](https://antoine.lelouet.fr)).
