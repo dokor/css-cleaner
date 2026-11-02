@@ -7,13 +7,14 @@ settings:
 importers:
 
   .:
+    dependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
 
 packages:
 

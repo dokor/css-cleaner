@@ -26,11 +26,13 @@
     "prepack": "pnpm run build"
   },
   "devDependencies": {
-    "@types/node": "24.10.0",
-    "typescript": "5.9.3"
+    "@types/node": "24.10.0"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dokor/css-cleaner.git"
+  },
+  "dependencies": {
+    "typescript": "5.9.3"
   }
 }
