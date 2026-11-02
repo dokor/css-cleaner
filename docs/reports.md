@@ -2,8 +2,9 @@
 
 `src/reports/index.ts` fournit les fonctions pures `renderReport` et `getExitCode`
 selon les signatures du contrat v1. Elles reçoivent des données en mémoire,
-sans lire les sources, écrire un fichier ou modifier le rapport. Le branchement
-dans la CLI et les réexports d’implémentations de `src/index.ts` relèvent de #7.
+sans lire les sources, écrire un fichier ou modifier le rapport. La CLI les appelle
+après le rapprochement et gère l’écriture sur stdout ou dans `--output <fichier>`.
+Les deux fonctions sont aussi réexportées depuis la racine du paquet.
 
 ```ts
 import { exampleReport } from "../examples/contract.js";

@@ -2,27 +2,50 @@
 
 CSS Cleaner est un projet de CLI qui aide à nettoyer progressivement les styles d’une application React, avec ou sans Next.js. Son objectif est de repérer les classes probablement inutilisées et les références à des styles manquants, puis d’indiquer où vérifier chaque résultat avant de modifier le code.
 
-**État du projet** — Le socle, la découverte, les analyseurs CSS/Sass et JSX, le rapprochement et les rapports sont fusionnés. La commande d’audit reste à assembler dans [l’issue #7](https://github.com/dokor/css-cleaner/issues/7), avant la validation sur Next.js et Vite dans [l’issue #8](https://github.com/dokor/css-cleaner/issues/8). [Suivre l’avancement sur GitHub](https://github.com/dokor/css-cleaner/issues/9).
+**État du projet** — La commande `css-cleaner scan` relie la découverte, les analyseurs CSS/Sass et JSX, le rapprochement et les rapports. La validation sur des projets témoins Next.js et Vite reste prévue dans [l’issue #8](https://github.com/dokor/css-cleaner/issues/8). [Suivre l’avancement sur GitHub](https://github.com/dokor/css-cleaner/issues/9).
 
 Deux faux positifs de confiance élevée sur les CSS Modules utilisés via une variable
 intermédiaire ou via `composes` sont suivis dans [l’issue #17](https://github.com/dokor/css-cleaner/issues/17).
 Leur correction fait partie des prérequis de sortie du MVP.
 
-## Ce que l’outil analysera
+## Ce que l’outil analyse
 
-- **Styles** — CSS, SCSS et Sass indenté, en fichiers globaux ou en CSS Modules (`.module.css`, `.module.scss`, `.module.sass`). L’analyse couvrira les sélecteurs composés et les variantes BEM imbriquées.
+- **Styles** — CSS, SCSS et Sass indenté, en fichiers globaux ou en CSS Modules (`.module.css`, `.module.scss`, `.module.sass`). L’analyse couvre les sélecteurs composés et les variantes BEM imbriquées.
 - **Composants React** — Classes écrites dans `className`, accès comme `styles.title`, conditions, appels à `clsx` ou `classnames` et chaînes de caractères interpolées.
-- **Portée des noms** — Une référence à `styles.title` sera recherchée dans le module importé par le composant. Une classe homonyme dans un autre module ne pourra pas masquer une faute.
+- **Portée des noms** — Une référence à `styles.title` est recherchée dans le module importé par le composant. Une classe homonyme dans un autre module ne peut pas masquer une faute.
 
 ## Exemple de diagnostic
 
-Si un composant construit une classe avec `button--${variant}`, l’analyse pourra rapprocher ce motif de `.button--primary` et `.button--secondary`. Le rapport les présentera comme des candidates à vérifier. À l’inverse, si le composant lit `styles.primray` et que son module déclare seulement `.primary`, le rapport signalera l’accès manquant et sa ligne dans le composant.
+Si un composant construit une classe avec `button--${variant}`, l’analyse rapproche ce motif de `.button--primary` et `.button--secondary`. Le rapport les présente comme des candidates à vérifier. À l’inverse, si le composant lit `styles.primray` et que son module déclare seulement `.primary`, le rapport signale l’accès manquant et sa ligne dans le composant.
 
-## Utilisation prévue
+## Utilisation
 
-La commande prévue est `css-cleaner scan .`, depuis la racine du projet. Elle analysera les sources en lecture seule, sans démarrer de serveur ni compiler l’application. Le MVP sera validé sur deux projets témoins, l’un sous Next.js et l’autre sous React avec Vite.
+Lancer `css-cleaner scan .` depuis la racine du projet, ou passer un autre répertoire. Sans chemin, `scan` analyse le répertoire courant. Les sources sont lues sans démarrer de serveur, exécuter la configuration applicative ni compiler l’application. Seule la configuration déclarative optionnelle [`css-cleaner.config.json`](src/discovery/README.md) est chargée.
 
-Le rapport regroupera les classes probablement inutilisées, les usages introuvables et les usages dynamiques à vérifier. Chaque diagnostic précisera son emplacement, sa raison et son niveau de confiance. Les formats prévus sont le terminal, JSON et Markdown. En CI, l’option `--fail-on-missing` permettra de faire échouer le contrôle sur les classes manquantes à confiance élevée.
+```sh
+css-cleaner scan .
+css-cleaner scan "./mon projet" --format json
+css-cleaner scan . --format markdown --output rapport.md
+css-cleaner scan . --format json --output rapport.json --fail-on-missing
+```
+
+Le format par défaut est `terminal` ; `--format` accepte aussi `json` et `markdown`.
+Sans `--output`, seul le rapport est écrit sur stdout : le JSON se parse directement.
+Avec `--output <fichier>`, le rapport est écrit en UTF-8 dans ce fichier et stdout reste
+vide. Un chemin de sortie relatif part du répertoire courant, même si le projet analysé
+est ailleurs. Le parent doit exister ; un rapport existant est remplacé, mais les
+sources analysées et la configuration du projet sont protégées contre l’écrasement.
+
+Le rapport regroupe les classes probablement inutilisées, les usages introuvables et
+les usages dynamiques à vérifier, avec leur emplacement, leur raison et leur confiance.
+Les avertissements des différentes étapes restent dans le rapport avec leur contexte.
+Les erreurs fatales sont écrites sur stderr et ne produisent pas de rapport.
+
+| Code | Situation |
+| --- | --- |
+| `0` | Scan terminé, y compris avec des usages dynamiques ou des avertissements récupérables. |
+| `1` | Au moins une classe manquante de confiance élevée, uniquement avec `--fail-on-missing`. Le rapport est quand même produit. |
+| `2` | Commande/option invalide, racine absente, erreur de configuration, de lecture ou d’écriture du rapport. |
 
 ## Installation et vérifications du socle
 
@@ -40,12 +63,12 @@ node dist/cli/index.js --help
 node dist/cli/index.js scan --help
 ```
 
-Les cinq composants du moteur sont implémentés et testables indépendamment.
-Le branchement de `scan` dans la CLI reste à réaliser dans l’issue #7.
+Les cinq composants du moteur sont implémentés, testables indépendamment et reliés à `scan`.
 Sans argument, `--help` et `-h` affichent l’aide
-avec un code de sortie 0. `scan --help` décrit la commande réservée.
-`scan [chemin]` ne réalise aucun audit et sort avec le code 2, comme les
-commandes/options inconnues.
+avec un code de sortie 0. `scan --help` décrit les options, les codes de sortie
+et des exemples copiables. Les tests lancent l’exécutable construit sur des projets
+temporaires, y compris dans des chemins avec espaces, et vérifient les sorties,
+les codes CI, les avertissements et la préservation des sources.
 
 `pnpm-lock.yaml` fixe les dépendances, dont TypeScript. Le build nettoie uniquement
 `dist/`, produit du JavaScript ESM et les déclarations TypeScript, et rend le
@@ -64,8 +87,7 @@ véritable nom de commande `css-cleaner`.
 Les données partagées se trouvent dans [`src/contracts.ts`](src/contracts.ts),
 réexportées par [`src/index.ts`](src/index.ts) avec les conventions. Les signatures
 ci-dessous sont des **types de fonctions**. Les implémentations sont disponibles
-dans les modules correspondants ; leur assemblage et leurs réexports publics
-font partie de l’issue #7.
+dans les modules correspondants et réexportées depuis la racine du paquet.
 
 | Module | Fonction et signature | Responsabilité |
 | --- | --- | --- |
@@ -74,9 +96,9 @@ font partie de l’issue #7.
 | `src/jsx/index.ts` | `analyzeJsx: AnalyzeJsx` — `JsxAnalysisInput → Promise<JsxAnalysis>` | Extraire les usages React JS/JSX/TS/TSX en appelant le résolveur injecté. |
 | `src/matching/index.ts` | `matchClasses: MatchClasses` — `AnalysisInput → AnalysisReport` | Rapprocher les identités et produire les diagnostics, sans accès disque. |
 | `src/reports/index.ts` | `renderReport: RenderReport` — `(AnalysisReport, ReportFormat) → string` ; `getExitCode: GetExitCode` — `(ScanOutcome, ExitCodeOptions) → ExitCode` | Rendre en terminal, JSON ou Markdown et décider le code CI, sans écrire la sortie. |
-| `src/cli/run.ts` | `runCli(args, output) → number` | Assembler les étapes et gérer arguments, sorties et codes de sortie ; l’aide seule est implémentée. |
+| `src/cli/run.ts` | `runCli(args, output) → Promise<ExitCode>` | Assembler les étapes et gérer arguments, sorties et codes de sortie. |
 
-Flux prévu : découverte → analyses styles/JSX indépendantes → rapprochement →
+Flux : découverte → analyses styles/JSX indépendantes → rapprochement →
 rendu → sortie CLI. Aucune étape ne doit exécuter l’application ni imposer Next.js.
 Les adaptations aux frameworks appartiennent à la découverte/résolution.
 
