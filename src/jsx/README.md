@@ -33,6 +33,12 @@ homonyme d’un import n’hérite pas de son identité.
   Une interpolation isolée comme `${styles.title}` garde son identité de module.
   Les usages dynamiques gardent l’expression source et une raison, sans inventer
   de candidats.
+- Les lectures de module comme `const name = styles.title` ou `styles[key]`
+  sont conservées aussi hors des attributs JSX et des helpers. Une lecture
+  statique protège la classe référencée ; une clé calculée protège les candidats
+  compatibles de son module. Un objet de module affecté à une variable ou
+  déstructuré dans une déclaration rend ses exports incertains, même si ses
+  usages ultérieurs ne sont pas traçables. Les bindings homonymes restent distincts.
 
 Les positions sont en lignes et colonnes UTF-16 à partir de 1. Un token littéral
 pointe sur son premier caractère dans la source, y compris en présence d’un
@@ -47,8 +53,9 @@ conditions et conserve donc les deux branches littérales. Elle n’effectue pas
 propagation de valeurs ou d’alias locaux, d’analyse inter-fichiers ni de résolution
 des helpers CommonJS, réexportés ou liés avec `classnames/bind`. Une variable
 utilisée dans `className`, un appel inconnu ou une concaténation non prise en
-charge reste un usage dynamique. Les classes construites hors de ces contextes
-ne sont pas déduites. Les spreads d’attributs JSX ne sont pas développés.
+charge reste un usage dynamique. Les lectures connues de CSS Modules sont
+comptées comme usages potentiels, sans prouver leur application au DOM.
+Les spreads d’attributs JSX ne sont pas développés.
 
 Les erreurs syntaxiques produisent des avertissements `jsx-parse-error` avec
 leur position et une portée projet, tout en conservant les usages que le parseur

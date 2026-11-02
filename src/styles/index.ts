@@ -1,11 +1,12 @@
 import { createRequire } from "node:module";
+import { posix } from "node:path";
 import postcss from "postcss";
 import type { ChildNode, Container, Root, Rule, Source } from "postcss";
 import type {
   AnalysisScope, AnalysisWarning, ClassDefinition, SourceLocation, StyleAnalysis,
-  StyleCoverage, StyleScope, StyleSource, StyleSyntax,
+  ProjectPath, StyleCoverage, StyleScope, StyleSource, StyleSyntax,
 } from "../contracts.js";
-import { classSymbolKey, compareLocations, compareText } from "../conventions.js";
+import { classSymbolKey, compareLocations, compareText, projectPath } from "../conventions.js";
 import { Selectors } from "./selectors.js";
 import type { SelectorContext } from "./selectors.js";
 
@@ -28,8 +29,9 @@ export const analyzeStyles: AnalyzeStyles = async (sources) => {
   const definitions: ClassDefinition[] = [];
   const warnings: AnalysisWarning[] = [];
   const coverage: StyleCoverage[] = [];
+  const scopesByFile = new Map(sources.map(source => [source.file, source.scope]));
   for (const source of [...sources].sort((a, b) => compareText(a.file, b.file))) {
-    const result = analyzeFile(source);
+    const result = analyzeFile(source, scopesByFile);
     definitions.push(...result.definitions);
     warnings.push(...result.warnings);
     coverage.push(...result.coverage);
@@ -40,7 +42,7 @@ export const analyzeStyles: AnalyzeStyles = async (sources) => {
   return { definitions, coverage, warnings };
 };
 
-function analyzeFile(source: StyleSource): StyleAnalysis {
+function analyzeFile(source: StyleSource, scopesByFile: ReadonlyMap<ProjectPath, StyleScope>): StyleAnalysis {
   const definitions: ClassDefinition[] = [];
   const warnings: AnalysisWarning[] = [];
   const statuses = new Map<StyleScope, StyleCoverage["status"]>([[source.scope, "complete"]]);
@@ -49,10 +51,11 @@ function analyzeFile(source: StyleSource): StyleAnalysis {
   const scopeReference = (scope: StyleScope): AnalysisScope => scope === "global"
     ? { scope: "global" }
     : { scope: "module", file: source.file };
-  const warn = (code: string, reason: string, location: SourceLocation, scopes: readonly StyleScope[]): void => {
+  const warn = (code: string, reason: string, location: SourceLocation, scopes: readonly StyleScope[], additionalScopes: readonly AnalysisScope[] = []): void => {
     const unique = [...new Set(scopes)].sort(compareText);
     for (const scope of unique) statuses.set(scope, "partial");
-    warnings.push({ stage: "styles", code, reason, location, affectedScopes: unique.map(scopeReference) });
+    const affectedScopes = new Map([...unique.map(scopeReference), ...additionalScopes].map(scope => [JSON.stringify(scope), scope]));
+    warnings.push({ stage: "styles", code, reason, location, affectedScopes: [...affectedScopes.values()] });
   };
   const scopesIn = (text: string, context: SelectorContext): StyleScope[] => {
     const scopes = [context.scope];
@@ -138,6 +141,10 @@ function analyzeFile(source: StyleSource): StyleAnalysis {
         } catch (error) {
           warn("unsupported-style-selector", errorMessage(error), locationAt(offset), uncertainScopes(node, parents, context, scopes));
         }
+      } else if (node.type === "decl" && node.prop.toLowerCase() === "composes") {
+        const scopes = selectors.scopes(parents);
+        warn("unresolved-css-composition", "CSS Modules composition dependencies are not resolved; classes in the affected scopes may be used by this composition.",
+          nodeLocation(node), scopes.length > 0 ? scopes : [context.scope], compositionTargetScopes(node.value, source.file, scopesByFile));
       }
     }
   };
@@ -150,6 +157,30 @@ function analyzeFile(source: StyleSource): StyleAnalysis {
   function nodeLocation(node: ChildNode): SourceLocation {
     return locationAt(node.source?.start?.offset ?? 0);
   }
+}
+
+/** Preserve uncertainty without guessing names or evaluating Sass expressions. */
+function compositionTargetScopes(value: string, file: ProjectPath, scopesByFile: ReadonlyMap<ProjectPath, StyleScope>): readonly AnalysisScope[] {
+  // Remove comments outside quoted paths before identifying the optional origin.
+  const text = value.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\//g,
+    token => token.startsWith("/*") ? " " : token).trim();
+  const origin = /\bfrom\s+(?:"([^"\\]*)"|'([^'\\]*)'|(global))\s*$/u.exec(text);
+  if (origin?.[3]) return [{ scope: "global" }];
+  const specifier = origin?.[1] ?? origin?.[2];
+  if (specifier && !/[?#$]/u.test(specifier) && (specifier.startsWith("./") || specifier.startsWith("../")) && /\.(?:css|scss|sass)$/u.test(specifier)) {
+    try {
+      const target = projectPath(posix.normalize(posix.join(posix.dirname(file), specifier)));
+      const scopes: AnalysisScope[] = [{ scope: "module", file: target }];
+      // A nominally global file can also declare explicit :local classes.
+      if (scopesByFile.get(target) === "global") scopes.push({ scope: "global" });
+      return scopes;
+    } catch {
+      // An origin outside the root cannot be assigned to a known project scope.
+    }
+  }
+  // Plain local names need no additional scope. Unknown origins and dynamic
+  // values may refer to any module, so the report must expose that uncertainty.
+  return /\bfrom\b|["'$#()\\]/u.test(text) ? [{ scope: "project" }] : [];
 }
 
 function createLocator(source: StyleSource): (offset: number) => SourceLocation {
