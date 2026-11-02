@@ -1,0 +1,73 @@
+# Rendus et codes de sortie
+
+`src/reports/index.ts` fournit les fonctions pures `renderReport` et `getExitCode`
+selon les signatures du contrat v1. Elles reçoivent des données en mémoire,
+sans lire les sources, écrire un fichier ou modifier le rapport. Le branchement
+dans la CLI et les réexports d’implémentations de `src/index.ts` relèvent de #7.
+
+```ts
+import { exampleReport } from "../examples/contract.js";
+import { getExitCode, renderReport } from "../src/reports/index.js";
+
+const terminal = renderReport(exampleReport, "terminal");
+const markdown = renderReport(exampleReport, "markdown");
+const json = renderReport(exampleReport, "json");
+const exitCode = getExitCode(
+  { status: "success", report: exampleReport },
+  { failOnMissing: true },
+);
+```
+
+Les rendus terminal et Markdown commencent par l’état du scan et les décomptes
+par catégorie, puis présentent les classes probablement inutilisées, les classes
+manquantes et les usages dynamiques. Ces trois sections sont présentes même si
+elles sont vides. Les imports non résolus et les diagnostics d’analyse disposent
+de sections supplémentaires lorsqu’ils existent. Chaque diagnostic conserve sa
+catégorie, son emplacement `fichier:ligne[:colonne]`, sa confiance, sa raison et
+ses candidats avec leurs propres emplacements, identités, confiances et raisons.
+Les identités de module indiquent le fichier propriétaire, même lorsque la
+déclaration provient d’un autre fichier.
+
+Les avertissements apparaissent séparément avec leur étape, code, raison,
+emplacement et portées affectées. Un avertissement également présent dans les
+diagnostics reste dans les deux collections : les décomptes distinguent ces deux
+ensembles. Un rapport `partial` affiche « Scan incomplet (partial). », y compris
+si ses listes sont vides. Les avertissements informatifs ne rendent pas à eux
+seuls un scan incomplet : le rendu respecte `report.completeness`.
+
+Le JSON restitue directement `AnalysisReport` v1, sans enveloppe ni changement du
+contrat. Les consommateurs calculent les comptes depuis `diagnostics` et
+`warnings`. Les clés des objets sont triées selon `compareText`, y compris dans
+les structures imbriquées, pour rendre identiques deux objets dont seul l’ordre
+d’insertion des propriétés diffère. Les tableaux gardent l’ordre fourni par les
+producteurs ; les rendus lisibles conservent cet ordre dans chaque catégorie.
+Les trois formats utilisent des fins de ligne LF et un saut de ligne final,
+sans horodatage, couleur ou donnée d’environnement. Le Markdown protège la
+ponctuation des sources ; les rendus lisibles échappent les retours de ligne et
+caractères de contrôle contenus dans les données. Le JSON préserve leur valeur.
+
+| Situation | Code |
+| --- | --- |
+| `ScanOutcome.status === "error"` | `2` |
+| Succès, `failOnMissing`, au moins un diagnostic `undefined-class` de confiance `high` | `1` |
+| Tout autre succès, même partiel ou accompagné d’avertissements récupérables | `0` |
+
+La politique considère la confiance du diagnostic, pas celle de ses candidats.
+Des classes inutilisées, des usages dynamiques ou des imports non résolus ne
+déclenchent jamais le code `1`. Un scan partiel peut contenir une classe manquante
+à confiance élevée dans une portée entièrement analysée ; il conserve alors le
+code `1` si l’option est active. Le rapprochement reste responsable de cette
+confiance ; le rendu et la décision ne réinterprètent pas les sources.
+
+Après `pnpm install --frozen-lockfile` :
+
+```sh
+pnpm typecheck
+pnpm test
+node --test .test-dist/tests/reports.test.js
+```
+
+Les tests utilisent le rapport d’exemple du socle et des fixtures en mémoire.
+Ils vérifient les trois formats, les localisations et candidats, les avertissements,
+les rapports vides et partiels, la stabilité, l’absence de mutation, ainsi que
+les codes `0`, `1` et `2`.

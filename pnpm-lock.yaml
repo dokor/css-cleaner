@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      picomatch:
+        specifier: 4.0.7
+        version: 4.0.7
       postcss:
         specifier: 8.5.31
         version: 8.5.31
@@ -17,13 +20,16 @@ importers:
       sass-parser:
         specifier: 0.5.3
         version: 0.5.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+      '@types/picomatch':
+        specifier: 4.0.3
+        version: 4.0.3
 
 packages:
 
@@ -111,6 +117,9 @@ packages:
 
   '@types/node@24.10.0':
     resolution: {integrity: sha512-qzQZRBqkFsYyaSWXuEHc2WR9c0a0CXwiE5FWUvn7ZM+vdy1uZLfCunD38UzhuB7YN/J11ndbDBcTmOdxJo9Q7A==}
+
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   chokidar@5.0.0:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
@@ -250,6 +259,8 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/picomatch@4.0.3': {}
+
   chokidar@5.0.0:
     dependencies:
       readdirp: 5.1.1
@@ -276,8 +287,7 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  picomatch@4.0.7:
-    optional: true
+  picomatch@4.0.7: {}
 
   postcss-selector-parser@7.1.7:
     dependencies:
