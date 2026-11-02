@@ -1,0 +1,3 @@
+allowBuilds:
+  # Source parsing does not use Sass's optional native file watcher.
+  '@parcel/watcher': false

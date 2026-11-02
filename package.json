@@ -32,5 +32,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dokor/css-cleaner.git"
+  },
+  "dependencies": {
+    "postcss": "8.5.31",
+    "postcss-selector-parser": "7.1.7",
+    "sass-parser": "0.5.3"
   }
 }
