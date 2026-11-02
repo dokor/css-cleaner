@@ -87,6 +87,6 @@ indépendamment de l’ordre du système de fichiers et de la locale.
 
 Les fixtures de `tests/discovery.test.ts` documentent ce format, la priorité des
 options, les exclusions, les six styles, `src/` et `app/`, les erreurs, les liens
-et la résolution avec un catalogue en mémoire. L’extraction JSX et l’assemblage
-de la CLI restent aux étapes suivantes ; aucun réexport d’implémentation n’est
-ajouté dans `src/index.ts`.
+et la résolution avec un catalogue en mémoire. La CLI appelle la découverte et
+injecte son résolveur dans l’analyse JSX. Les implémentations sont aussi
+réexportées depuis `src/index.ts`.

@@ -2,8 +2,8 @@
 
 `analyzeJsx: AnalyzeJsx` reçoit les sources en mémoire et le service
 `resolveStyleImport` du contrat v1. Il ne lit pas le disque, ne charge pas les
-modules JavaScript et n’exécute pas l’application. Aucun changement du contrat
-partagé ni réexport d’implémentation dans `src/index.ts` n’est nécessaire.
+modules JavaScript et n’exécute pas l’application. Le contrat partagé reste
+inchangé ; l’implémentation est aussi réexportée depuis `src/index.ts`.
 
 Le parseur TypeScript 5.9.3, déjà utilisé par le socle, devient une dépendance
 d’exécution pour que l’analyse fonctionne après une installation de production.

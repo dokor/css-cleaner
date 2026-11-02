@@ -2,8 +2,8 @@
 
 `matchClasses: MatchClasses` est une fonction synchrone de `AnalysisInput` vers
 `AnalysisReport`. Elle n’accède pas au disque et ne modifie pas ses entrées.
-Le contrat v1 reste inchangé ; le réexport de l’implémentation à la racine du
-paquet appartient à l’intégration #7.
+Le contrat v1 reste inchangé ; l’implémentation est aussi réexportée à la racine du
+paquet et appelée par la commande `scan`.
 
 Une identité de module inclut son fichier propriétaire et son nom, indépendamment
 de son extension CSS, SCSS ou Sass. Une chaîne globale consulte exclusivement

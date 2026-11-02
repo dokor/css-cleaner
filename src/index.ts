@@ -1,5 +1,11 @@
 export type * from "./contracts.js";
 export * from "./conventions.js";
+export { createStyleImportResolver, discoverProject, DiscoveryError } from "./discovery/index.js";
+export type { DiscoveryErrorCode } from "./discovery/index.js";
+export { analyzeStyles } from "./styles/index.js";
+export { analyzeJsx } from "./jsx/index.js";
+export { matchClasses } from "./matching/index.js";
+export { getExitCode, renderReport } from "./reports/index.js";
 export type { CreateStyleImportResolver, DiscoverProject } from "./discovery/index.js";
 export type { AnalyzeStyles } from "./styles/index.js";
 export type { AnalyzeJsx } from "./jsx/index.js";
