@@ -2,7 +2,11 @@
 
 CSS Cleaner est un projet de CLI qui aide à nettoyer progressivement les styles d’une application React, avec ou sans Next.js. Son objectif est de repérer les classes probablement inutilisées et les références à des styles manquants, puis d’indiquer où vérifier chaque résultat avant de modifier le code.
 
-**État du projet** — Le socle TypeScript est disponible. Le moteur d’audit est en développement. Les fonctionnalités décrites ci-dessous constituent le périmètre du MVP. [Suivre l’avancement sur GitHub](https://github.com/dokor/css-cleaner/issues/9).
+**État du projet** — Le socle, la découverte, les analyseurs CSS/Sass et JSX, le rapprochement et les rapports sont fusionnés. La commande d’audit reste à assembler dans [l’issue #7](https://github.com/dokor/css-cleaner/issues/7), avant la validation sur Next.js et Vite dans [l’issue #8](https://github.com/dokor/css-cleaner/issues/8). [Suivre l’avancement sur GitHub](https://github.com/dokor/css-cleaner/issues/9).
+
+Deux faux positifs de confiance élevée sur les CSS Modules utilisés via une variable
+intermédiaire ou via `composes` sont suivis dans [l’issue #17](https://github.com/dokor/css-cleaner/issues/17).
+Leur correction fait partie des prérequis de sortie du MVP.
 
 ## Ce que l’outil analysera
 
@@ -36,9 +40,9 @@ node dist/cli/index.js --help
 node dist/cli/index.js scan --help
 ```
 
-Le socle fournit actuellement les contrats, les conventions et l’aide de la CLI.
-Les parseurs, le rapprochement, les rendus et le branchement de `scan` restent
-réservés aux tickets suivants. Sans argument, `--help` et `-h` affichent l’aide
+Les cinq composants du moteur sont implémentés et testables indépendamment.
+Le branchement de `scan` dans la CLI reste à réaliser dans l’issue #7.
+Sans argument, `--help` et `-h` affichent l’aide
 avec un code de sortie 0. `scan --help` décrit la commande réservée.
 `scan [chemin]` ne réalise aucun audit et sort avec le code 2, comme les
 commandes/options inconnues.
@@ -55,14 +59,15 @@ consommateur, installer cette archive avec `pnpm add /chemin/css-cleaner-0.1.0.t
 puis lancer `pnpm exec css-cleaner --help`. Le champ `bin` du paquet expose le
 véritable nom de commande `css-cleaner`.
 
-## Points d’entrée pour les tickets suivants
+## Points d’entrée des composants
 
 Les données partagées se trouvent dans [`src/contracts.ts`](src/contracts.ts),
 réexportées par [`src/index.ts`](src/index.ts) avec les conventions. Les signatures
-ci-dessous sont des **types de fonctions** ; chaque ticket peut ajouter sa
-fonction dans le module réservé et la tester avec des entrées en mémoire.
+ci-dessous sont des **types de fonctions**. Les implémentations sont disponibles
+dans les modules correspondants ; leur assemblage et leurs réexports publics
+font partie de l’issue #7.
 
-| Module réservé | Fonction à fournir et signature | Responsabilité |
+| Module | Fonction et signature | Responsabilité |
 | --- | --- | --- |
 | `src/discovery/index.ts` | `discoverProject: DiscoverProject` — `DiscoveryOptions → Promise<DiscoveredProject>` ; `createStyleImportResolver: CreateStyleImportResolver` — `DiscoveredProject → ResolveStyleImport` | Charger la configuration, découvrir/lire les sources et fournir le résolveur d’imports. |
 | `src/styles/index.ts` | `analyzeStyles: AnalyzeStyles` — `readonly StyleSource[] → Promise<StyleAnalysis>` | Extraire les définitions CSS/SCSS/Sass, localisations et avertissements. |
