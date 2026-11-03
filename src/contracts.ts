@@ -43,6 +43,8 @@ export interface ProjectConfig {
   /** Normalized root-relative path mappings; discovery defines the declarative config format. */
   readonly aliases: Readonly<Record<string, readonly string[]>>;
   readonly externalGlobals: readonly ExternalGlobalClass[];
+  /** Optional presentation/CI policy; never changes the analysis itself. */
+  readonly policy?: PolicyConfig;
 }
 
 export interface DiscoveryOptions {
@@ -202,6 +204,40 @@ export interface AnalysisReport {
   readonly warnings: readonly AnalysisWarning[];
 }
 
+export type Severity = "error" | "warning" | "info";
+
+export interface PolicyRule {
+  readonly enabled: boolean;
+  readonly severity: Severity;
+  /** Only enabled errors at or above this confidence block CI. */
+  readonly minConfidence: Confidence;
+}
+
+export interface PolicyConfig {
+  readonly rules?: Readonly<Partial<Record<DiagnosticCategory, Partial<PolicyRule>>>>;
+  readonly requireComplete?: boolean;
+}
+
+export interface ResolvedPolicy {
+  readonly rules: Readonly<Record<DiagnosticCategory, PolicyRule>>;
+  readonly requireComplete: boolean;
+}
+
+export interface EvaluatedDiagnostic extends PolicyRule {
+  /** Original diagnostic, including the confidence assigned by the engine. */
+  readonly diagnostic: Diagnostic;
+  readonly blocking: boolean;
+}
+
+export interface PolicyEvaluation {
+  readonly policy: ResolvedPolicy;
+  readonly diagnostics: readonly EvaluatedDiagnostic[];
+  /** Counts diagnostics only; warnings are not counted a second time. */
+  readonly blockingCount: number;
+  readonly incompleteFailure: boolean;
+  readonly failed: boolean;
+}
+
 /** Choose disk discovery or a complete, normalized in-memory project snapshot. */
 export type ScanProjectOptions =
   | (DiscoveryOptions & { readonly snapshot?: never })
@@ -225,7 +261,8 @@ export type ScanOutcome =
   | { readonly status: "error"; readonly reason: string; readonly location?: SourceLocation };
 
 export interface ExitCodeOptions {
-  readonly failOnMissing: boolean;
+  readonly failOnMissing?: boolean;
+  readonly policy?: PolicyConfig;
 }
 
 export type ExitCode = 0 | 1 | 2;

@@ -1,13 +1,14 @@
 import type {
   AnalysisReport, AnalysisScope, ClassSymbol, DiagnosticCategory, ExitCode,
-  ExitCodeOptions, ReportFormat, ScanOutcome, SourceLocation,
+  ExitCodeOptions, PolicyConfig, PolicyEvaluation, ReportFormat, ScanOutcome, SourceLocation,
 } from "../contracts.js";
 import { compareText } from "../conventions.js";
+import { evaluatePolicy, resolvePolicy } from "../policy/index.js";
 
 /** Deterministic text/JSON/Markdown rendering, without writing output. */
-export type RenderReport = (report: AnalysisReport, format: ReportFormat) => string;
+export type RenderReport = (report: AnalysisReport, format: ReportFormat, policy?: PolicyConfig) => string;
 
-/** Success=0, high-confidence missing class with failOnMissing=1, fatal error=2. */
+/** Accepted policy=0, policy failure=1, fatal error=2. Legacy failOnMissing is retained. */
 export type GetExitCode = (outcome: ScanOutcome, options: ExitCodeOptions) => ExitCode;
 
 const categories = [
@@ -19,7 +20,8 @@ const categories = [
 ] as const satisfies readonly (readonly [DiagnosticCategory, string])[];
 
 /** Pure renderer. Array order belongs to the producers and is preserved within each category. */
-export const renderReport: RenderReport = (report, format) => {
+export const renderReport: RenderReport = (report, format, policy) => {
+  const evaluation = policy === undefined ? undefined : evaluatePolicy(report, policy);
   switch (format) {
     case "json":
       // Canonical object keys also make equivalent objects with different insertion orders identical.
@@ -29,17 +31,16 @@ export const renderReport: RenderReport = (report, format) => {
         return Object.fromEntries(Object.entries(value).sort(([left], [right]) => compareText(left, right)));
       }, 2) + "\n";
     case "terminal":
-      return renderReadableReport(report, false);
+      return renderReadableReport(report, false, evaluation);
     case "markdown":
-      return renderReadableReport(report, true);
+      return renderReadableReport(report, true, evaluation);
   }
 };
 
 export const getExitCode: GetExitCode = (outcome, options) => {
   if (outcome.status === "error") return 2;
-  return options.failOnMissing && outcome.report.diagnostics.some(
-    (diagnostic) => diagnostic.category === "undefined-class" && diagnostic.confidence === "high",
-  ) ? 1 : 0;
+  const policy = resolvePolicy(options.policy, {}, { failOnMissing: options.failOnMissing ?? false });
+  return evaluatePolicy(outcome.report, policy).failed ? 1 : 0;
 };
 
 function locationText(location: SourceLocation): string {
@@ -79,10 +80,11 @@ function markdownCode(value: string): string {
   return `${delimiter} ${text} ${delimiter}`;
 }
 
-function renderReadableReport(report: AnalysisReport, markdown: boolean): string {
+function renderReadableReport(report: AnalysisReport, markdown: boolean, evaluation?: PolicyEvaluation): string {
   const prose = markdown ? markdownText : singleLine;
   const code = markdown ? markdownCode : singleLine;
   const heading = (label: string) => markdown ? `## ${label}` : label;
+  const assessments = new Map(evaluation?.diagnostics.map((entry) => [entry.diagnostic, entry]));
   const groups = categories.map(([category, label]) => ({
     category, label, diagnostics: report.diagnostics.filter((diagnostic) => diagnostic.category === category),
   }));
@@ -94,6 +96,12 @@ function renderReadableReport(report: AnalysisReport, markdown: boolean): string
     `Diagnostics : ${report.diagnostics.length}`,
     ...groups.map(({ label, diagnostics }) => `- ${label} : ${diagnostics.length}`),
     `- Avertissements : ${report.warnings.length}`,
+    ...(evaluation === undefined ? [] : [
+      "", `Politique CI : ${evaluation.failed ? "refusée" : "acceptée"}`,
+      `Diagnostics bloquants : ${evaluation.blockingCount}`,
+      `Analyse complète exigée : ${evaluation.policy.requireComplete ? "oui" : "non"}`,
+      ...(evaluation.incompleteFailure ? ["Échec CI : analyse partielle alors qu’une analyse complète est exigée."] : []),
+    ]),
   ];
 
   for (const { category, label, diagnostics } of groups) {
@@ -103,8 +111,15 @@ function renderReadableReport(report: AnalysisReport, markdown: boolean): string
     if (diagnostics.length === 0) lines.push("Aucun résultat.");
     for (const diagnostic of diagnostics) {
       const symbol = diagnostic.symbol ? ` — ${code(symbolText(diagnostic.symbol))}` : "";
+      const assessment = assessments.get(diagnostic);
       lines.push(
         `- ${code(locationText(diagnostic.location))}${symbol} [${diagnostic.category}]`,
+        ...(assessment === undefined ? [] : [
+          `  - Règle : ${assessment.enabled ? "activée" : "désactivée"}`,
+          `  - Gravité : ${code(assessment.severity)}`,
+          `  - Seuil CI : ${code(assessment.minConfidence)}`,
+          `  - Bloquant : ${assessment.blocking ? "oui" : "non"}`,
+        ]),
         `  - Confiance : ${code(diagnostic.confidence)}`,
         `  - Raison : ${prose(diagnostic.reason)}`,
       );

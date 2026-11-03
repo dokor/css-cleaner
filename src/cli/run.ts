@@ -1,10 +1,12 @@
 import { realpath, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import type { DiscoveredProject, ExitCode, ReportFormat, ScanOutcome } from "../contracts.js";
+import type { DiscoveredProject, ExitCode, PolicyConfig, ReportFormat, ScanOutcome } from "../contracts.js";
 import { CONFIG_FILE } from "../discovery/config.js";
 import { getExitCode, renderReport } from "../reports/index.js";
 import { scanProject, ScanProjectError } from "../scan/index.js";
+import { resolvePolicy } from "../policy/index.js";
+import { cliPolicy } from "./policy.js";
 
 export interface CliOutput {
   readonly stdout: (text: string) => void;
@@ -38,15 +40,24 @@ Options :
   --format terminal|json|markdown  Format du rapport (défaut : terminal)
   --output <fichier>              Écrire le rapport dans un fichier au lieu de stdout
   --fail-on-missing               Code 1 si une classe manque avec confiance élevée
+  --rule <catégorie>=<règle>      Gravité error|warning|info[:high|medium|low], ou off
+  --require-complete             Code 1 si l’analyse est partielle
+  --allow-partial                Accepter une analyse partielle (priorité sur le fichier)
   -h, --help                     Afficher cette aide
 
 Le fichier de sortie est relatif au répertoire courant ; son parent doit exister.
 Les sources analysées et css-cleaner.config.json ne peuvent pas être écrasés.
 Les avertissements sont inclus dans le rapport, y compris en JSON.
+--rule est répétable pour des catégories distinctes ; chaque gravité réactive la règle.
+Catégories : unused-class, undefined-class, dynamic-usage, unresolved-import, analysis-warning.
+Priorité : défauts < fichier policy < --fail-on-missing < options explicites.
+--fail-on-missing et --rule undefined-class=... sont incompatibles.
+--require-complete et --allow-partial sont incompatibles.
+Le JSON reste le rapport brut v1 ; terminal et Markdown affichent la politique explicite.
 
 Codes de sortie :
   0  Scan terminé (y compris usages dynamiques ou avertissements récupérables)
-  1  Classe manquante de confiance élevée avec --fail-on-missing
+  1  Politique CI non satisfaite (règle bloquante ou analyse complète exigée)
   2  Arguments invalides, erreur de lecture, de configuration ou d’écriture
 
 Exemples :
@@ -54,6 +65,7 @@ Exemples :
   css-cleaner scan "./mon projet" --format json
   css-cleaner scan . --format markdown --output rapport.md
   css-cleaner scan . --format json --output rapport.json --fail-on-missing
+  css-cleaner scan . --rule unused-class=error:high --require-complete
 `;
 
 interface ScanOptions {
@@ -61,6 +73,8 @@ interface ScanOptions {
   readonly format: ReportFormat;
   readonly outputFile?: string;
   readonly failOnMissing: boolean;
+  readonly policy: PolicyConfig;
+  readonly showPolicy: boolean;
   readonly help: boolean;
 }
 
@@ -73,6 +87,9 @@ function scanOptions(args: readonly string[]): ScanOptions {
       format: { type: "string", default: "terminal" },
       output: { type: "string" },
       "fail-on-missing": { type: "boolean", default: false },
+      rule: { type: "string", multiple: true },
+      "require-complete": { type: "boolean", default: false },
+      "allow-partial": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -84,10 +101,12 @@ function scanOptions(args: readonly string[]): ScanOptions {
   if (values.output !== undefined && (values.output.trim() === "" || values.output.includes("\0"))) {
     throw new Error("--output attend un chemin de fichier non vide, sans caractère NUL.");
   }
+  const policy = cliPolicy(values.rule ?? [], values["require-complete"], values["allow-partial"], values["fail-on-missing"]);
   return {
     rootDir: positionals[0] ?? ".", format,
     ...(values.output === undefined ? {} : { outputFile: values.output }),
     failOnMissing: values["fail-on-missing"], help: values.help,
+    policy, showPolicy: values.rule !== undefined || values["require-complete"] || values["allow-partial"],
   };
 }
 
@@ -160,10 +179,11 @@ export async function runCli(args: readonly string[], output: CliOutput): Promis
     }
     try {
       const { project, report } = await scanProject({ rootDir: options.rootDir });
-      const content = renderReport(report, options.format);
+      const policy = resolvePolicy(project.config.policy, options.policy, { failOnMissing: options.failOnMissing });
+      const content = renderReport(report, options.format, options.showPolicy || project.config.policy !== undefined ? policy : undefined);
       if (options.outputFile === undefined) output.stdout(content);
       else await writeReport(options.outputFile, content, project);
-      return getExitCode({ status: "success", report }, { failOnMissing: options.failOnMissing });
+      return getExitCode({ status: "success", report }, { policy });
     } catch (error) {
       return reportError(error, output, options.failOnMissing);
     }

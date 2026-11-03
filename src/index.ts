@@ -8,6 +8,8 @@ export { matchClasses } from "./matching/index.js";
 export { getExitCode, renderReport } from "./reports/index.js";
 export { scanProject, ScanProjectError } from "./scan/index.js";
 export type { ScanProject, ScanProjectErrorCode, ScanProjectStage } from "./scan/index.js";
+export { evaluatePolicy, resolvePolicy, PolicyError } from "./policy/index.js";
+export type { EvaluatePolicy, ResolvePolicy, PolicyErrorCode } from "./policy/index.js";
 export type { CreateStyleImportResolver, DiscoverProject } from "./discovery/index.js";
 export type { AnalyzeStyles } from "./styles/index.js";
 export type { AnalyzeJsx } from "./jsx/index.js";
