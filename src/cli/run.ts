@@ -2,12 +2,9 @@ import { realpath, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { DiscoveredProject, ExitCode, ReportFormat, ScanOutcome } from "../contracts.js";
-import { createStyleImportResolver, discoverProject, DiscoveryError } from "../discovery/index.js";
 import { CONFIG_FILE } from "../discovery/config.js";
-import { analyzeJsx } from "../jsx/index.js";
-import { matchClasses } from "../matching/index.js";
 import { getExitCode, renderReport } from "../reports/index.js";
-import { analyzeStyles } from "../styles/index.js";
+import { scanProject, ScanProjectError } from "../scan/index.js";
 
 export interface CliOutput {
   readonly stdout: (text: string) => void;
@@ -133,7 +130,7 @@ function errorMessage(error: unknown): string {
 }
 
 function reportError(error: unknown, output: CliOutput, failOnMissing: boolean): ExitCode {
-  const location = error instanceof DiscoveryError ? error.location : undefined;
+  const location = error instanceof ScanProjectError ? error.location : undefined;
   const outcome: ScanOutcome = {
     status: "error", reason: errorMessage(error),
     ...(location === undefined ? {} : { location }),
@@ -162,12 +159,7 @@ export async function runCli(args: readonly string[], output: CliOutput): Promis
       return 0;
     }
     try {
-      const project = await discoverProject({ rootDir: options.rootDir });
-      const [styles, jsx] = await Promise.all([
-        analyzeStyles(project.styles),
-        analyzeJsx({ sources: project.react, resolveStyleImport: createStyleImportResolver(project) }),
-      ]);
-      const report = matchClasses({ styles, jsx, externalGlobals: project.config.externalGlobals, warnings: project.warnings });
+      const { project, report } = await scanProject({ rootDir: options.rootDir });
       const content = renderReport(report, options.format);
       if (options.outputFile === undefined) output.stdout(content);
       else await writeReport(options.outputFile, content, project);

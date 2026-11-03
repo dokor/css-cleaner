@@ -202,6 +202,22 @@ export interface AnalysisReport {
   readonly warnings: readonly AnalysisWarning[];
 }
 
+/** Choose disk discovery or a complete, normalized in-memory project snapshot. */
+export type ScanProjectOptions =
+  | (DiscoveryOptions & { readonly snapshot?: never })
+  | {
+      readonly snapshot: DiscoveredProject;
+      readonly rootDir?: never;
+      readonly include?: never;
+      readonly exclude?: never;
+    };
+
+export interface ScanProjectResult {
+  readonly report: AnalysisReport;
+  /** Inputs actually analyzed, retained for IDE consumers and CLI output protection. */
+  readonly project: DiscoveredProject;
+}
+
 export type ReportFormat = "terminal" | "json" | "markdown";
 
 export type ScanOutcome =

@@ -6,6 +6,8 @@ export { analyzeStyles } from "./styles/index.js";
 export { analyzeJsx } from "./jsx/index.js";
 export { matchClasses } from "./matching/index.js";
 export { getExitCode, renderReport } from "./reports/index.js";
+export { scanProject, ScanProjectError } from "./scan/index.js";
+export type { ScanProject, ScanProjectErrorCode, ScanProjectStage } from "./scan/index.js";
 export type { CreateStyleImportResolver, DiscoverProject } from "./discovery/index.js";
 export type { AnalyzeStyles } from "./styles/index.js";
 export type { AnalyzeJsx } from "./jsx/index.js";

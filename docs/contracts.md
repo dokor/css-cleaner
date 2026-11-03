@@ -4,6 +4,12 @@ Le contrat partagé est `src/contracts.ts`. Les résultats sont sérialisables e
 JSON ; les tableaux sont `readonly` pour permettre des tests sans mutation.
 `AnalysisReport.schemaVersion` vaut `1`.
 
+L’[API de projet](scan-project.md) ajoute `ScanProjectOptions` (découverte disque
+ou `snapshot: DiscoveredProject`) et `ScanProjectResult` (`report` et `project`
+analysé). Ces types ne modifient pas le schéma du rapport v1. `scanProject` les
+utilise pour assembler les étapes ; les fonctions de chaque composant restent
+disponibles indépendamment.
+
 ## Entrées et sorties
 
 La découverte retourne `DiscoveredProject` : configuration, textes des styles,
