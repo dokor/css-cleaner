@@ -6,6 +6,11 @@ sans lire les sources, écrire un fichier ou modifier le rapport. La CLI les app
 après le rapprochement et gère l’écriture sur stdout ou dans `--output <fichier>`.
 Les deux fonctions sont aussi réexportées depuis la racine du paquet.
 
+La [politique CI configurable](ci-policy.md) fournit les fonctions pures
+`resolvePolicy` et `evaluatePolicy`. `renderReport` accepte un troisième argument
+optionnel `policy` : terminal/Markdown ajoutent gravités, seuils, activations et
+décisions de blocage. Le JSON reste le rapport brut v1.
+
 ```ts
 import { exampleReport } from "../examples/contract.js";
 import { getExitCode, renderReport } from "../src/reports/index.js";
@@ -50,15 +55,22 @@ caractères de contrôle contenus dans les données. Le JSON préserve leur vale
 | Situation | Code |
 | --- | --- |
 | `ScanOutcome.status === "error"` | `2` |
-| Succès, `failOnMissing`, au moins un diagnostic `undefined-class` de confiance `high` | `1` |
-| Tout autre succès, même partiel ou accompagné d’avertissements récupérables | `0` |
+| Succès, au moins un diagnostic bloquant selon la politique | `1` |
+| Succès partiel, avec `policy.requireComplete: true` | `1` |
+| Succès accepté par la politique, même partiel ou accompagné d’avertissements récupérables par défaut | `0` |
 
 La politique considère la confiance du diagnostic, pas celle de ses candidats.
-Des classes inutilisées, des usages dynamiques ou des imports non résolus ne
-déclenchent jamais le code `1`. Un scan partiel peut contenir une classe manquante
-à confiance élevée dans une portée entièrement analysée ; il conserve alors le
-code `1` si l’option est active. Le rapprochement reste responsable de cette
-confiance ; le rendu et la décision ne réinterprètent pas les sources.
+Un diagnostic bloque si sa règle est activée, sa gravité vaut `error` et sa
+confiance atteint le seuil configuré. Par défaut toutes les gravités sont
+`warning` ou `info`, donc aucun diagnostic ne bloque. Le raccourci historique
+`failOnMissing` impose toujours `error` et `high` à `undefined-class` ; sans
+nouvelle configuration, lui seul peut produire le code `1`.
+
+Un scan partiel peut contenir une classe manquante à confiance élevée dans une
+portée entièrement analysée ; il conserve alors le code `1` si le raccourci est
+actif. Le rapprochement reste responsable de cette confiance ; la politique ne
+la modifie pas. Les avertissements déjà présents dans les diagnostics ne sont
+pas comptés une deuxième fois dans `blockingCount`.
 
 Après `pnpm install --frozen-lockfile` :
 

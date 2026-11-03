@@ -18,7 +18,7 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "docs/scan-project.md", "examples/scan-project.mjs"],
+  "files": ["dist", "README.md", "docs/scan-project.md", "docs/ci-policy.md", "examples/scan-project.mjs"],
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",

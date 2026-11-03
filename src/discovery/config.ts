@@ -6,6 +6,8 @@ import type {
 } from "../contracts.js";
 import { projectPath, sourceLocation } from "../conventions.js";
 import { DiscoveryError, ioCode } from "./errors.js";
+import { parsePolicyConfig } from "../policy/config.js";
+import { PolicyError } from "../policy/errors.js";
 
 export const CONFIG_FILE = "css-cleaner.config.json";
 
@@ -153,11 +155,20 @@ export async function loadProjectConfig(rootDir: string, options: DiscoveryOptio
       if (cause instanceof DiscoveryError) throw cause;
       invalid("JSON", cause instanceof Error ? cause.message : String(cause));
     }
-    onlyKeys(local, ["include", "exclude", "aliases", "externalGlobals"], "configuration");
+    onlyKeys(local, ["include", "exclude", "aliases", "externalGlobals", "policy"], "configuration");
   }
   // Validate even overridden fields so a typo in the local file never goes unnoticed.
   const include = local.include === undefined ? DEFAULT_INCLUDE : globs(local.include, "include");
   const exclude = local.exclude === undefined ? [] : globs(local.exclude, "exclude");
+  let policy: ProjectConfig["policy"];
+  if (Object.hasOwn(local, "policy")) {
+    try {
+      policy = parsePolicyConfig(local.policy);
+    } catch (cause) {
+      if (cause instanceof PolicyError) invalid(cause.field, cause.detail);
+      throw cause;
+    }
+  }
   return {
     rootDir,
     include: options.include === undefined ? [...include] : globs(options.include, "options.include"),
@@ -167,5 +178,6 @@ export async function loadProjectConfig(rootDir: string, options: DiscoveryOptio
     ])],
     aliases: local.aliases === undefined ? {} : aliases(local.aliases),
     externalGlobals: local.externalGlobals === undefined ? [] : externalGlobals(local.externalGlobals),
+    ...(policy === undefined ? {} : { policy }),
   };
 }

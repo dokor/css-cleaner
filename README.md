@@ -28,6 +28,7 @@ css-cleaner scan .
 css-cleaner scan "./mon projet" --format json
 css-cleaner scan . --format markdown --output rapport.md
 css-cleaner scan . --format json --output rapport.json --fail-on-missing
+css-cleaner scan . --rule unused-class=error:high --require-complete
 ```
 
 Le format par défaut est `terminal` ; `--format` accepte aussi `json` et `markdown`.
@@ -44,9 +45,17 @@ Les erreurs fatales sont écrites sur stderr et ne produisent pas de rapport.
 
 | Code | Situation |
 | --- | --- |
-| `0` | Scan terminé, y compris avec des usages dynamiques ou des avertissements récupérables. |
-| `1` | Au moins une classe manquante de confiance élevée, uniquement avec `--fail-on-missing`. Le rapport est quand même produit. |
+| `0` | Scan terminé et politique CI satisfaite. Sans option ni configuration CI, les diagnostics restent non bloquants. |
+| `1` | Politique CI non satisfaite : diagnostic bloquant ou analyse complète exigée. Le rapport est quand même produit. |
 | `2` | Commande/option invalide, racine absente, erreur de configuration, de lecture ou d’écriture du rapport. |
+
+La [politique CI configurable](docs/ci-policy.md) sépare gravité et confiance :
+seule une règle activée de gravité `error` bloque quand sa confiance atteint le
+seuil choisi. `policy.rules` et `policy.requireComplete` se configurent dans le
+fichier du projet ; `--rule`, `--require-complete` et `--allow-partial` permettent
+de les remplacer. `--fail-on-missing` reste le raccourci compatible pour une classe
+manquante de confiance élevée. Le rapport JSON brut garde son schéma v1 ; les
+rapports lisibles affichent la politique explicite et sa décision.
 
 ## Installation et vérifications du socle
 
@@ -112,7 +121,8 @@ dans les modules correspondants et réexportées depuis la racine du paquet.
 | `src/styles/index.ts` | `analyzeStyles: AnalyzeStyles` — `readonly StyleSource[] → Promise<StyleAnalysis>` | Extraire les définitions CSS/SCSS/Sass, localisations et avertissements. |
 | `src/jsx/index.ts` | `analyzeJsx: AnalyzeJsx` — `JsxAnalysisInput → Promise<JsxAnalysis>` | Extraire les usages React JS/JSX/TS/TSX en appelant le résolveur injecté. |
 | `src/matching/index.ts` | `matchClasses: MatchClasses` — `AnalysisInput → AnalysisReport` | Rapprocher les identités et produire les diagnostics, sans accès disque. |
-| `src/reports/index.ts` | `renderReport: RenderReport` — `(AnalysisReport, ReportFormat) → string` ; `getExitCode: GetExitCode` — `(ScanOutcome, ExitCodeOptions) → ExitCode` | Rendre en terminal, JSON ou Markdown et décider le code CI, sans écrire la sortie. |
+| `src/reports/index.ts` | `renderReport: RenderReport` — `(AnalysisReport, ReportFormat, PolicyConfig?) → string` ; `getExitCode: GetExitCode` — `(ScanOutcome, ExitCodeOptions) → ExitCode` | Rendre en terminal, JSON ou Markdown et décider le code CI, sans écrire la sortie. |
+| `src/policy/index.ts` | `resolvePolicy(config?, overrides?, options?) → ResolvedPolicy` ; `evaluatePolicy(report, policy?) → PolicyEvaluation` | Appliquer la politique CI et les gravités sans modifier le rapport ni sa confiance. |
 | `src/cli/run.ts` | `runCli(args, output) → Promise<ExitCode>` | Appeler `scanProject` et gérer arguments, sorties et codes de sortie. |
 
 Flux : découverte → analyses styles/JSX indépendantes → rapprochement →

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import type { TestContext } from "node:test";
 import type { AnalysisReport } from "../src/contracts.js";
+import { runCli } from "../src/cli/run.js";
 
 // Tests run from .test-dist/tests, but exercise the actual package bin in dist/.
 const executable = fileURLToPath(new URL("../../dist/cli/index.js", import.meta.url));
@@ -278,4 +279,152 @@ test("unknown commands and options return an actionable error", () => {
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /css-cleaner --help/);
   }
+});
+
+test("configured CI rules block unused classes while all report formats and raw confidence remain available", async (t) => {
+  const config = JSON.stringify({ policy: { rules: { "unused-class": { severity: "error", minConfidence: "high" } } } });
+  const root = await fixture(t, { "Card.module.css": ".unused {}\n", "css-cleaner.config.json": config });
+  for (const format of ["terminal", "markdown", "json"]) {
+    const result = run(["scan", root, "--format", format, "--output", "report.txt"], root);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+    const text = await readFile(join(root, "report.txt"), "utf8");
+    if (format === "json") {
+      const report = jsonReport(text);
+      assert.deepEqual(report.diagnostics.map((entry) => [entry.category, entry.confidence]), [["unused-class", "high"]]);
+      assert.ok(!("severity" in report.diagnostics[0]!));
+      assert.ok(!("policy" in report));
+    } else {
+      assert.match(text, /Politique CI : refusée/);
+      assert.match(text, /Diagnostics bloquants : 1/);
+      assert.match(text, /Gravité : (?:` )?error/);
+    }
+  }
+  assert.equal(await readFile(join(root, "Card.module.css"), "utf8"), ".unused {}\n");
+  assert.equal(await readFile(join(root, "css-cleaner.config.json"), "utf8"), config);
+});
+
+test("an error severity keeps low confidence and blocks only when the threshold explicitly permits it", async (t) => {
+  const root = await fixture(t, {
+    "Card.module.css": ".bad {\n",
+    "Card.tsx": 'import s from "./Card.module.css"; export default () => <div className={s.typo} />;',
+    "css-cleaner.config.json": JSON.stringify({ policy: { rules: { "undefined-class": { severity: "error" } } } }),
+  });
+  const cautious = run(["scan", root, "--format", "json"], root);
+  assert.equal(cautious.status, 0);
+  const strict = run(["scan", root, "--format", "json", "--rule", "undefined-class=error:low"], root);
+  assert.equal(strict.status, 1);
+  const report = jsonReport(strict.stdout);
+  assert.equal(report.completeness, "partial");
+  assert.equal(report.diagnostics.find((entry) => entry.category === "undefined-class")?.confidence, "low");
+  assert.deepEqual(jsonReport(cautious.stdout), report);
+  const readable = run(["scan", root], root);
+  assert.equal(readable.status, 0);
+  assert.match(readable.stdout, /Gravité : error/);
+  assert.match(readable.stdout, /Confiance : low/);
+  assert.match(readable.stdout, /Diagnostics bloquants : 0/);
+});
+
+test("CLI rules override file severity and activation while retaining an unspecified confidence threshold", async (t) => {
+  const root = await fixture(t, {
+    "Card.module.css": ".unused {}",
+    "css-cleaner.config.json": JSON.stringify({ policy: { rules: { "unused-class": { severity: "error", minConfidence: "medium" } } } }),
+  });
+  for (const [args, expected] of [
+    [[], 1], [["--rule", "unused-class=warning"], 0], [["--rule", "unused-class=off"], 0],
+  ] as const) {
+    const result = run(["scan", root, ...args], root);
+    assert.equal(result.status, expected);
+    assert.match(result.stdout, /Seuil CI : medium/);
+    if (args.some((arg) => arg === "unused-class=off")) assert.match(result.stdout, /Règle : désactivée/);
+  }
+  await writeFile(join(root, "css-cleaner.config.json"), JSON.stringify({ policy: { rules: { "unused-class": { enabled: false, minConfidence: "medium" } } } }));
+  const activated = run(["scan", root, "--rule", "unused-class=error"], root);
+  assert.equal(activated.status, 1);
+  assert.match(activated.stdout, /Règle : activée/);
+  assert.match(activated.stdout, /Seuil CI : medium/);
+});
+
+test("completeness switches override the file without hiding partial analysis or warnings", async (t) => {
+  const root = await fixture(t, {
+    "Card.module.css": ".bad {\n",
+    "css-cleaner.config.json": JSON.stringify({ policy: { requireComplete: true } }),
+  });
+  for (const [args, expected] of [
+    [[], 1], [["--allow-partial"], 0], [["--require-complete", "--rule", "analysis-warning=off"], 1],
+  ] as const) {
+    const result = run(["scan", root, "--format", "json", ...args], root);
+    assert.equal(result.status, expected);
+    assert.equal(result.stderr, "");
+    const report = jsonReport(result.stdout);
+    assert.equal(report.completeness, "partial");
+    assert.ok(report.warnings.length > 0);
+  }
+  await writeFile(join(root, "css-cleaner.config.json"), JSON.stringify({ policy: { requireComplete: false } }));
+  const strict = run(["scan", root, "--require-complete"], root);
+  assert.equal(strict.status, 1);
+  assert.match(strict.stdout, /Diagnostics bloquants : 0/);
+  assert.match(strict.stdout, /Échec CI : analyse partielle/);
+});
+
+test("the legacy shortcut overrides a file rule and combines with explicit rules for other categories", async (t) => {
+  const root = await fixture(t, {
+    ...missingFiles,
+    "css-cleaner.config.json": JSON.stringify({ policy: { rules: { "undefined-class": { enabled: false, severity: "info", minConfidence: "low" } } } }),
+  });
+  assert.equal(run(["scan", root], root).status, 0);
+  const legacy = run(["scan", root, "--fail-on-missing", "--rule", "dynamic-usage=info"], root);
+  assert.equal(legacy.status, 1);
+  assert.match(legacy.stdout, /Gravité : error/);
+  assert.match(legacy.stdout, /Seuil CI : high/);
+});
+
+test("malformed and conflicting policy options fail before discovery or output writes", async (t) => {
+  const root = await fixture(t);
+  const cases = [
+    ["--rule", "missing=error"], ["--rule", "unused-class=fatal"], ["--rule", "unused-class=error:certain"],
+    ["--rule", "unused-class=off:high"], ["--rule", "unused-class=error:"], ["--rule", "unused-class=error:high:low"],
+    ["--rule", "unused-class"], ["--rule", "unused-class="], ["--rule", "=error"], ["--rule", "unused-class=error=low"],
+    ["--rule", "unused-class=error", "--rule", "unused-class=off"],
+    ["--require-complete", "--allow-partial"], ["--fail-on-missing", "--rule", "undefined-class=error:high"],
+  ];
+  for (const args of cases) {
+    let stdout = "", stderr = "";
+    const code = await runCli(["scan", join(root, "absent"), "--output", join(root, "report.json"), ...args], {
+      stdout: (text) => { stdout += text; }, stderr: (text) => { stderr += text; },
+    });
+    assert.equal(code, 2, args.join(" "));
+    assert.equal(stdout, "");
+    assert.match(stderr, /css-cleaner scan --help/);
+    assert.match(stderr, /--rule|policy|incompatibles|--fail-on-missing/);
+    assert.doesNotMatch(stderr, /Cannot scan project/);
+  }
+  // Exercise the same conflict through the built binary as well.
+  assert.equal(run(["scan", root, "--require-complete", "--allow-partial"], root).status, 2);
+  await assert.rejects(readFile(join(root, "report.json")), { code: "ENOENT" });
+});
+
+test("invalid configured policy remains a localized fatal error even when CLI overrides it", async (t) => {
+  const root = await fixture(t, {
+    "css-cleaner.config.json": JSON.stringify({ policy: { rules: { "unused-class": { minConfidence: "certain" } } } }),
+  });
+  const result = run(["scan", root, "--format", "json", "--rule", "unused-class=error:high"], root);
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /css-cleaner\.config\.json:1/);
+  assert.match(result.stderr, /policy.rules.unused-class.minConfidence/);
+});
+
+test("policy summaries count warnings once and report write errors retain code 2", async (t) => {
+  const root = await fixture(t, { "Card.module.css": ".bad {\n" });
+  const args = ["scan", root, "--rule", "analysis-warning=error:low"];
+  const result = run(args, root);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Diagnostics bloquants : 1/);
+  assert.match(result.stdout, /Avertissements : 1/);
+  const writeError = run([...args, "--output", "missing/report.txt"], root);
+  assert.equal(writeError.status, 2);
+  assert.equal(writeError.stdout, "");
+  assert.match(writeError.stderr, /Impossible d’écrire le rapport/);
 });

@@ -9,7 +9,7 @@ sont conservés tels quels, sans parsing ni compilation.
 
 La configuration optionnelle est **`css-cleaner.config.json`**, uniquement à la
 racine passée au scan. Aucun fichier JavaScript de configuration n’est exécuté.
-Le contrat partagé v1 est conservé sans modification.
+Le schéma du rapport v1 est conservé ; la politique CI est un réglage optionnel.
 
 ```json
 {
@@ -53,6 +53,9 @@ Le contrat partagé v1 est conservé sans modification.
   tous les autres caractères sont littéraux. Ces motifs deviennent les fragments
   `literal`/`unknown` du contrat. Les chaînes représentent des noms exacts.
   La découverte transmet ces autorisations sans faire le rapprochement des classes.
+- `policy` contient les règles de gravité et blocage CI et l’exigence optionnelle
+  `requireComplete`. La découverte valide et conserve les réglages sans les
+  appliquer au moteur. Voir [le guide de politique CI](../../docs/ci-policy.md).
 
 Les options absentes donnent des alias et classes externes vides. Les clés
 inconnues et valeurs mal typées sont refusées. `DiscoveryError` expose un `code`

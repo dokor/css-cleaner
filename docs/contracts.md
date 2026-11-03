@@ -10,6 +10,13 @@ analysé). Ces types ne modifient pas le schéma du rapport v1. `scanProject` le
 utilise pour assembler les étapes ; les fonctions de chaque composant restent
 disponibles indépendamment.
 
+La [politique CI](ci-policy.md) ajoute les types `PolicyConfig`, `PolicyRule`,
+`Severity`, `ResolvedPolicy`, `EvaluatedDiagnostic` et `PolicyEvaluation`.
+`ProjectConfig.policy` est optionnel pour préserver les instantanés existants.
+L’évaluation conserve les diagnostics bruts et leur confiance ; elle ne fait pas
+partie du schéma `AnalysisReport` v1. `ExitCodeOptions.policy` et le raccourci
+optionnel `failOnMissing` permettent de choisir le code de sortie.
+
 ## Entrées et sorties
 
 La découverte retourne `DiscoveredProject` : configuration, textes des styles,
@@ -25,7 +32,8 @@ résolveur. Son entrée `StyleImportRequest` contient le spécificateur, le bind
 par la configuration et les avertissements de découverte.
 Les avertissements des analyseurs restent dans `styles.warnings` et
 `jsx.warnings`. Le rapprochement conserve les trois ensembles dans le rapport.
-Le rendu reçoit uniquement ce rapport et un format (`terminal`, `json`, `markdown`).
+Le rendu reçoit ce rapport, un format (`terminal`, `json`, `markdown`) et,
+facultativement, une politique pour la présentation lisible.
 Les interfaces sont indépendantes du système de fichiers, sauf la découverte
 et la résolution d’imports qui pourront lire la configuration du projet.
 
@@ -109,8 +117,9 @@ sans dégrader les diagnostics d’un module distinct entièrement analysé.
 
 `AnalysisReport.completeness` indique explicitement un scan `complete` ou
 `partial`. `ScanOutcome` distingue ce succès (même partiel) d’une erreur fatale.
-La future fonction `GetExitCode` décidera : 0 pour le succès, 1 uniquement en mode
-`failOnMissing` avec une classe certainement manquante, 2 pour une erreur fatale.
+`GetExitCode` décide : 0 pour une politique acceptée, 1 pour une politique
+non satisfaite, 2 pour une erreur fatale. Sans nouvelle politique, seul le mode
+`failOnMissing` avec une classe manquante de confiance élevée peut produire 1.
 Les avertissements récupérables restent dans le rapport.
 
 ## Tri stable
