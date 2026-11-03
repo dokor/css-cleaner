@@ -85,6 +85,21 @@ véritable nom de commande `css-cleaner`.
 
 ## Points d’entrée des composants
 
+L’API publique [`scanProject`](docs/scan-project.md) assemble le moteur sans sortie
+console ni écriture de rapport. Elle accepte un répertoire ou un instantané complet
+en mémoire pour les intégrations IDE ; la CLI appelle la même fonction.
+
+```ts
+import { scanProject } from "css-cleaner";
+
+const { report } = await scanProject({ rootDir: "." });
+// Exploiter report.diagnostics, report.warnings et report.completeness.
+```
+
+Les erreurs fatales rejettent la promesse avec `ScanProjectError` (code, étape,
+localisation éventuelle et cause). Une analyse partielle reste un rapport v1.
+L’[exemple consommateur](examples/scan-project.mjs) utilise les exports du paquet.
+
 Les données partagées se trouvent dans [`src/contracts.ts`](src/contracts.ts),
 réexportées par [`src/index.ts`](src/index.ts) avec les conventions. Les signatures
 ci-dessous sont des **types de fonctions**. Les implémentations sont disponibles
@@ -92,12 +107,13 @@ dans les modules correspondants et réexportées depuis la racine du paquet.
 
 | Module | Fonction et signature | Responsabilité |
 | --- | --- | --- |
+| `src/scan/index.ts` | `scanProject: ScanProject` — `ScanProjectOptions → Promise<ScanProjectResult>` | Assembler la découverte ou l’instantané, les analyses et le rapprochement ; retourner rapport et entrées analysées. |
 | `src/discovery/index.ts` | `discoverProject: DiscoverProject` — `DiscoveryOptions → Promise<DiscoveredProject>` ; `createStyleImportResolver: CreateStyleImportResolver` — `DiscoveredProject → ResolveStyleImport` | Charger la configuration, découvrir/lire les sources et fournir le résolveur d’imports. |
 | `src/styles/index.ts` | `analyzeStyles: AnalyzeStyles` — `readonly StyleSource[] → Promise<StyleAnalysis>` | Extraire les définitions CSS/SCSS/Sass, localisations et avertissements. |
 | `src/jsx/index.ts` | `analyzeJsx: AnalyzeJsx` — `JsxAnalysisInput → Promise<JsxAnalysis>` | Extraire les usages React JS/JSX/TS/TSX en appelant le résolveur injecté. |
 | `src/matching/index.ts` | `matchClasses: MatchClasses` — `AnalysisInput → AnalysisReport` | Rapprocher les identités et produire les diagnostics, sans accès disque. |
 | `src/reports/index.ts` | `renderReport: RenderReport` — `(AnalysisReport, ReportFormat) → string` ; `getExitCode: GetExitCode` — `(ScanOutcome, ExitCodeOptions) → ExitCode` | Rendre en terminal, JSON ou Markdown et décider le code CI, sans écrire la sortie. |
-| `src/cli/run.ts` | `runCli(args, output) → Promise<ExitCode>` | Assembler les étapes et gérer arguments, sorties et codes de sortie. |
+| `src/cli/run.ts` | `runCli(args, output) → Promise<ExitCode>` | Appeler `scanProject` et gérer arguments, sorties et codes de sortie. |
 
 Flux : découverte → analyses styles/JSX indépendantes → rapprochement →
 rendu → sortie CLI. Aucune étape ne doit exécuter l’application ni imposer Next.js.
